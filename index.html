@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login — ALONE ESPORT</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-card card glow-purple">
+    <div style="font-size:2.4rem;">🎮</div>
+    <div class="login-logo">ALONE ESPORT</div>
+    <div class="login-tag">GUILD MANAGEMENT SYSTEM</div>
+
+    <form id="login-form">
+      <div class="field" style="text-align:left;">
+        <label>Nama</label>
+        <input type="text" id="login-name" placeholder="Masukkan nama" autocomplete="username" required>
+      </div>
+      <div class="field" style="text-align:left;">
+        <label>Password</label>
+        <div class="toggle-pass">
+          <input type="password" id="login-pass" placeholder="Masukkan password" autocomplete="current-password" required>
+          <button type="button" id="toggle-pass-btn">👁</button>
+        </div>
+      </div>
+      <div class="field" style="text-align:left; display:flex; align-items:center; gap:8px;">
+        <input type="checkbox" id="remember-me" style="width:auto;">
+        <label style="margin:0; text-transform:none; letter-spacing:0; font-size:.85rem;" for="remember-me">Ingat saya</label>
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; padding:13px;">Masuk</button>
+    </form>
+
+    <div class="hint-box">
+      <strong style="color:var(--cyan);">Akun Owner Demo</strong><br>
+      Arya / 1 &nbsp;•&nbsp; Ipan / 1 &nbsp;•&nbsp; Pian / 1
+    </div>
+  </div>
+</div>
+
+<script src="assets/app.js"></script>
+<script>
+injectBackground();
+
+document.getElementById('toggle-pass-btn').addEventListener('click', ()=>{
+  const inp = document.getElementById('login-pass');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+});
+
+// If already logged in, redirect
+if(getSession()){ window.location.href = 'dashboard.html'; }
+
+document.getElementById('login-form').addEventListener('submit', (e)=>{
+  e.preventDefault();
+  const nama = document.getElementById('login-name').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const remember = document.getElementById('remember-me').checked;
+  const db = getDB();
+  const member = db.members.find(m => m.nama.toLowerCase() === nama.toLowerCase() && m.password === pass);
+  if(!member){
+    toast('Nama atau password salah', 'err');
+    return;
+  }
+  if(member.status === 'Nonaktif'){
+    toast('Akun ini nonaktif, hubungi Owner', 'err');
+    return;
+  }
+  setSession(member, remember);
+  toast(`Selamat datang, ${member.nama}!`, 'ok');
+  setTimeout(()=> navigateTo('dashboard.html'), 500);
+});
+</script>
+</body>
+</html>

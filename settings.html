@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settings — ALONE ESPORT</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<script src="assets/app.js"></script>
+<script>
+const session = buildShell('settings.html', 'Settings', 'Pengaturan akun & preferensi pemutar musik');
+if(session){
+  const isOwner = session.role === 'Owner';
+  const content = document.getElementById('page-content');
+
+  function render(){
+    const db = getDB();
+    const me = db.members.find(m=>m.id===session.id);
+    content.innerHTML = `
+      <div class="card panel">
+        <h3>Akun Saya</h3>
+        <div class="grid grid-2">
+          <div class="field"><label>Nama</label><input id="sf-nama" value="${escapeHtml(me.nama)}"></div>
+          <div class="field"><label>Role</label><input value="${me.role}" disabled></div>
+        </div>
+        <div class="field"><label>Password Baru (kosongkan jika tidak diubah)</label><input id="sf-pass" type="password" placeholder="••••••"></div>
+        <button class="btn btn-primary" id="sf-save">Simpan Perubahan</button>
+        <button class="btn btn-danger" id="sf-logout" style="margin-left:10px;">Logout</button>
+      </div>
+
+      ${isOwner ? `
+      <div class="card panel">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <h3 style="margin:0;">Playlist Audio Mengambang</h3>
+          <button class="btn btn-primary btn-sm" id="add-track-btn">+ Tambah Lagu</button>
+        </div>
+        <table style="margin-top:10px;">
+          <thead><tr><th>Judul</th><th>Artis</th><th>Aksi</th></tr></thead>
+          <tbody>
+            ${db.playlist.map(t=>`
+              <tr>
+                <td>${escapeHtml(t.title)}</td>
+                <td>${escapeHtml(t.artist)}</td>
+                <td class="row-actions"><button class="btn btn-sm btn-danger del-track-btn" data-id="${t.id}">Hapus</button></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+      ` : ''}
+    `;
+
+    document.getElementById('sf-save').addEventListener('click', ()=>{
+      const nama = document.getElementById('sf-nama').value.trim();
+      const pass = document.getElementById('sf-pass').value;
+      if(!nama){ toast('Nama wajib diisi','err'); return; }
+      const db2 = getDB();
+      const target = db2.members.find(m=>m.id===session.id);
+      target.nama = nama;
+      if(pass) target.password = pass;
+      saveDB(db2);
+      setSession(target, !!localStorage.getItem('alone_esport_session'));
+      toast('Pengaturan akun disimpan','ok');
+      setTimeout(()=> navigateTo('settings.html'), 600);
+    });
+    document.getElementById('sf-logout').addEventListener('click', ()=>{
+      clearSession();
+      navigateTo('index.html');
+    });
+
+    if(isOwner){
+      document.getElementById('add-track-btn').addEventListener('click', ()=>{
+        openModal(`
+          <h3>Tambah Lagu</h3>
+          <div class="field"><label>Judul</label><input id="tf-title"></div>
+          <div class="field"><label>Artis</label><input id="tf-artist"></div>
+          <div class="field"><label>URL Audio (MP3)</label><input id="tf-url" placeholder="https://..."></div>
+          <div class="modal-actions">
+            <button class="btn btn-ghost" id="tf-cancel">Batal</button>
+            <button class="btn btn-primary" id="tf-save">Simpan</button>
+          </div>
+        `, ()=>{
+          document.getElementById('tf-cancel').addEventListener('click', closeModal);
+          document.getElementById('tf-save').addEventListener('click', ()=>{
+            const title = document.getElementById('tf-title').value.trim();
+            const artist = document.getElementById('tf-artist').value.trim();
+            const url = document.getElementById('tf-url').value.trim();
+            if(!title || !url){ toast('Judul dan URL wajib diisi','err'); return; }
+            const db2 = getDB();
+            db2.playlist.push({ id: uid('s'), title, artist: artist || 'Unknown', url });
+            saveDB(db2);
+            toast('Lagu ditambahkan ke playlist','ok');
+            closeModal();
+            render();
+          });
+        });
+      });
+      content.querySelectorAll('.del-track-btn').forEach(b=> b.addEventListener('click', ()=>{
+        const db2 = getDB();
+        if(db2.playlist.length <= 1){ toast('Playlist minimal harus punya 1 lagu','err'); return; }
+        db2.playlist = db2.playlist.filter(t=>t.id!==b.dataset.id);
+        saveDB(db2);
+        toast('Lagu dihapus dari playlist','ok');
+        render();
+      }));
+    }
+  }
+
+  render();
+}
+</script>
+</body>
+</html>

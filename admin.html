@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — ALONE ESPORT</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<script src="assets/app.js"></script>
+<script>
+const session = buildShell('admin.html', 'Admin', 'Kelola akun admin guild');
+if(session){
+  const isOwner = session.role === 'Owner';
+  const content = document.getElementById('page-content');
+
+  if(!isOwner){
+    content.innerHTML = `<div class="card panel empty"><div class="e-icon">🔒</div>Halaman ini hanya dapat diakses oleh Owner.</div>`;
+  } else {
+    function render(){
+      const db = getDB();
+      const admins = db.members.filter(m=>m.role==='Admin');
+      content.innerHTML = `
+        <div class="card panel">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <h3 style="margin:0;">Daftar Admin (${admins.length})</h3>
+            <button class="btn btn-primary" id="add-admin-btn">+ Buat Admin Baru</button>
+          </div>
+          <div style="overflow-x:auto; margin-top:10px;">
+          <table>
+            <thead><tr><th>Nama</th><th>Status</th><th>Bergabung</th><th>Aksi</th></tr></thead>
+            <tbody>
+              ${admins.length ? admins.map(m=>`
+                <tr>
+                  <td><strong>${escapeHtml(m.nama)}</strong></td>
+                  <td><span class="badge ${m.status==='Aktif'?'badge-ok':'badge-muted'}">${m.status}</span></td>
+                  <td>${m.joined}</td>
+                  <td class="row-actions">
+                    <button class="btn btn-sm btn-ghost edit-btn" data-id="${m.id}">Edit</button>
+                    <button class="btn btn-sm btn-danger del-btn" data-id="${m.id}">Hapus</button>
+                  </td>
+                </tr>
+              `).join('') : `<tr><td colspan="4"><div class="empty">Belum ada admin</div></td></tr>`}
+            </tbody>
+          </table>
+          </div>
+        </div>
+      `;
+      document.getElementById('add-admin-btn').addEventListener('click', ()=> openAdminModal(null));
+      content.querySelectorAll('.edit-btn').forEach(b=> b.addEventListener('click', ()=> openAdminModal(b.dataset.id)));
+      content.querySelectorAll('.del-btn').forEach(b=> b.addEventListener('click', ()=> deleteAdmin(b.dataset.id)));
+    }
+
+    function openAdminModal(id){
+      const db = getDB();
+      const m = id ? db.members.find(x=>x.id===id) : null;
+      openModal(`
+        <h3>${m ? 'Edit Admin' : 'Buat Admin Baru'}</h3>
+        <div class="field"><label>Nama</label><input id="af-nama" value="${m ? escapeHtml(m.nama) : ''}"></div>
+        <div class="field"><label>Password ${m ? '(kosongkan jika tidak diubah)' : ''}</label><input id="af-pass" type="text" placeholder="${m ? '••••••' : 'Password admin'}"></div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" id="af-cancel">Batal</button>
+          <button class="btn btn-primary" id="af-save">Simpan</button>
+        </div>
+      `, ()=>{
+        document.getElementById('af-cancel').addEventListener('click', closeModal);
+        document.getElementById('af-save').addEventListener('click', ()=>{
+          const nama = document.getElementById('af-nama').value.trim();
+          const pass = document.getElementById('af-pass').value;
+          if(!nama){ toast('Nama wajib diisi','err'); return; }
+          const db2 = getDB();
+          if(m){
+            const target = db2.members.find(x=>x.id===m.id);
+            target.nama = nama;
+            if(pass) target.password = pass;
+            toast('Data admin diperbarui','ok');
+          } else {
+            if(!pass){ toast('Password wajib diisi','err'); return; }
+            db2.members.push({ id: uid('m'), nama, password: pass, role:'Admin', status:'Aktif', joined: todayStr() });
+            toast('Admin baru dibuat','ok');
+          }
+          saveDB(db2);
+          closeModal();
+          render();
+        });
+      });
+    }
+
+    function deleteAdmin(id){
+      const db = getDB();
+      const m = db.members.find(x=>x.id===id);
+      if(!m) return;
+      if(!confirm(`Hapus admin "${m.nama}"?`)) return;
+      db.members = db.members.filter(x=>x.id!==id);
+      saveDB(db);
+      toast('Admin dihapus','ok');
+      render();
+    }
+
+    render();
+  }
+}
+</script>
+</body>
+</html>

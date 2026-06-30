@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Peringatan — ALONE ESPORT</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<script src="assets/app.js"></script>
+<script>
+const session = buildShell('peringatan.html', 'Peringatan', 'Catatan peringatan untuk anggota');
+if(session){
+  const isOwner = session.role === 'Owner';
+  const content = document.getElementById('page-content');
+
+  function render(){
+    const db = getDB();
+    const list = isOwner ? db.warnings : db.warnings.filter(w=>w.memberId===session.id);
+
+    content.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:18px;">
+        <div style="color:var(--muted);">${list.length} peringatan ${isOwner ? 'tercatat' : 'untuk Anda'}</div>
+        ${isOwner ? `<button class="btn btn-primary" id="add-warn-btn">+ Buat Peringatan</button>` : ''}
+      </div>
+      <div class="card panel">
+        <div style="overflow-x:auto;">
+        <table>
+          <thead><tr>${isOwner?'<th>Anggota</th>':''}<th>Pesan</th><th>Tanggal</th><th>Status</th>${isOwner?'<th>Aksi</th>':''}</tr></thead>
+          <tbody>
+            ${list.length ? list.map(w=>{
+              const m = db.members.find(mm=>mm.id===w.memberId);
+              return `<tr>
+                ${isOwner ? `<td><strong>${m ? escapeHtml(m.nama) : 'Unknown'}</strong></td>` : ''}
+                <td>${escapeHtml(w.message)}</td>
+                <td>${w.date}</td>
+                <td><span class="badge ${w.status==='Sudah Dibaca'?'badge-ok':'badge-pink'}">${w.status}</span></td>
+                ${isOwner ? `<td class="row-actions">
+                  <button class="btn btn-sm btn-ghost edit-btn" data-id="${w.id}">Edit</button>
+                  <button class="btn btn-sm btn-danger del-btn" data-id="${w.id}">Hapus</button>
+                </td>` : ''}
+              </tr>`;
+            }).join('') : `<tr><td colspan="${isOwner?5:3}"><div class="empty"><div class="e-icon">✨</div>Tidak ada peringatan</div></td></tr>`}
+          </tbody>
+        </table>
+        </div>
+      </div>
+    `;
+
+    if(isOwner){
+      document.getElementById('add-warn-btn').addEventListener('click', ()=> openWarnModal(null));
+      content.querySelectorAll('.edit-btn').forEach(b=> b.addEventListener('click', ()=> openWarnModal(b.dataset.id)));
+      content.querySelectorAll('.del-btn').forEach(b=> b.addEventListener('click', ()=> deleteWarn(b.dataset.id)));
+    } else {
+      // members can mark their own as read
+      content.querySelectorAll('tbody tr').forEach((row,i)=>{
+        const w = list[i];
+        if(w && w.status === 'Belum Dibaca'){
+          row.style.cursor='pointer';
+          row.title = 'Klik untuk tandai sudah dibaca';
+          row.addEventListener('click', ()=>{
+            const db2 = getDB();
+            const target = db2.warnings.find(x=>x.id===w.id);
+            target.status = 'Sudah Dibaca';
+            saveDB(db2);
+            toast('Ditandai sudah dibaca','ok');
+            render();
+          });
+        }
+      });
+    }
+  }
+
+  function openWarnModal(id){
+    const db = getDB();
+    const w = id ? db.warnings.find(x=>x.id===id) : null;
+    openModal(`
+      <h3>${w ? 'Edit Peringatan' : 'Buat Peringatan'}</h3>
+      <div class="field"><label>Anggota</label>
+        <select id="wf-member">
+          ${db.members.map(m=>`<option value="${m.id}" ${w && w.memberId===m.id?'selected':''}>${escapeHtml(m.nama)} (${m.role})</option>`).join('')}
+        </select>
+      </div>
+      <div class="field"><label>Pesan</label><textarea id="wf-msg" rows="3">${w ? escapeHtml(w.message) : ''}</textarea></div>
+      <div class="field"><label>Tanggal</label><input id="wf-date" type="date" value="${w ? w.date : todayStr()}"></div>
+      <div class="field"><label>Status</label>
+        <select id="wf-status">
+          <option value="Belum Dibaca" ${!w || w.status==='Belum Dibaca'?'selected':''}>Belum Dibaca</option>
+          <option value="Sudah Dibaca" ${w && w.status==='Sudah Dibaca'?'selected':''}>Sudah Dibaca</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="wf-cancel">Batal</button>
+        <button class="btn btn-primary" id="wf-save">Simpan</button>
+      </div>
+    `, ()=>{
+      document.getElementById('wf-cancel').addEventListener('click', closeModal);
+      document.getElementById('wf-save').addEventListener('click', ()=>{
+        const memberId = document.getElementById('wf-member').value;
+        const message = document.getElementById('wf-msg').value.trim();
+        const date = document.getElementById('wf-date').value || todayStr();
+        const status = document.getElementById('wf-status').value;
+        if(!message){ toast('Pesan wajib diisi','err'); return; }
+        const db2 = getDB();
+        if(w){
+          const target = db2.warnings.find(x=>x.id===w.id);
+          target.memberId = memberId; target.message = message; target.date = date; target.status = status;
+          toast('Peringatan diperbarui','ok');
+        } else {
+          db2.warnings.push({ id: uid('w'), memberId, message, date, status });
+          toast('Peringatan dibuat','ok');
+        }
+        saveDB(db2);
+        closeModal();
+        render();
+      });
+    });
+  }
+
+  function deleteWarn(id){
+    const db = getDB();
+    if(!confirm('Hapus peringatan ini?')) return;
+    db.warnings = db.warnings.filter(x=>x.id!==id);
+    saveDB(db);
+    toast('Peringatan dihapus','ok');
+    render();
+  }
+
+  render();
+}
+</script>
+</body>
+</html>

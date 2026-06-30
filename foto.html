@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Foto — ALONE ESPORT</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<script src="assets/app.js"></script>
+<script>
+const session = buildShell('foto.html', 'Foto', 'Galeri momen guild ALONE ESPORT');
+if(session){
+  const isOwner = session.role === 'Owner';
+  const content = document.getElementById('page-content');
+
+  function render(){
+    const db = getDB();
+    content.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:18px;">
+        <div style="color:var(--muted);">${db.photos.length} foto tersimpan</div>
+        ${isOwner ? `<button class="btn btn-primary" id="add-photo-btn">+ Upload Foto</button>` : ''}
+      </div>
+      <div class="photo-grid" id="photo-grid"></div>
+    `;
+    const grid = document.getElementById('photo-grid');
+    grid.innerHTML = db.photos.length ? db.photos.map(p=>`
+      <div class="card photo-card glow-purple">
+        <img src="${p.url}" alt="${escapeHtml(p.title)}" onerror="this.src='https://placehold.co/400x300/14142a/00f0ff?text=ALONE+ESPORT'">
+        <div class="pc-body">
+          <h4>${escapeHtml(p.title)}</h4>
+          <p>${escapeHtml(p.desc)}</p>
+          ${isOwner ? `<div class="row-actions" style="margin-top:10px;">
+            <button class="btn btn-sm btn-ghost edit-btn" data-id="${p.id}">Edit</button>
+            <button class="btn btn-sm btn-danger del-btn" data-id="${p.id}">Hapus</button>
+          </div>` : ''}
+        </div>
+      </div>
+    `).join('') : `<div class="card empty" style="grid-column:1/-1;"><div class="e-icon">🖼️</div>Belum ada foto</div>`;
+
+    if(isOwner){
+      document.getElementById('add-photo-btn').addEventListener('click', ()=> openPhotoModal(null));
+      grid.querySelectorAll('.edit-btn').forEach(b=> b.addEventListener('click', ()=> openPhotoModal(b.dataset.id)));
+      grid.querySelectorAll('.del-btn').forEach(b=> b.addEventListener('click', ()=> deletePhoto(b.dataset.id)));
+    }
+  }
+
+  function openPhotoModal(id){
+    const db = getDB();
+    const p = id ? db.photos.find(x=>x.id===id) : null;
+    openModal(`
+      <h3>${p ? 'Edit Foto' : 'Upload Foto'}</h3>
+      <div class="field"><label>Judul</label><input id="pf-title" value="${p ? escapeHtml(p.title) : ''}"></div>
+      <div class="field"><label>Deskripsi</label><textarea id="pf-desc" rows="3">${p ? escapeHtml(p.desc) : ''}</textarea></div>
+      <div class="field"><label>URL Gambar</label><input id="pf-url" value="${p ? p.url : ''}" placeholder="https://..."></div>
+      <div class="field"><label>atau Upload File</label><input id="pf-file" type="file" accept="image/*"></div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="pf-cancel">Batal</button>
+        <button class="btn btn-primary" id="pf-save">Simpan</button>
+      </div>
+    `, ()=>{
+      document.getElementById('pf-cancel').addEventListener('click', closeModal);
+      document.getElementById('pf-file').addEventListener('change', (e)=>{
+        const file = e.target.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = ()=>{ document.getElementById('pf-url').value = reader.result; toast('File dimuat, klik Simpan','info'); };
+        reader.readAsDataURL(file);
+      });
+      document.getElementById('pf-save').addEventListener('click', ()=>{
+        const title = document.getElementById('pf-title').value.trim();
+        const desc = document.getElementById('pf-desc').value.trim();
+        const url = document.getElementById('pf-url').value.trim();
+        if(!title || !url){ toast('Judul dan gambar wajib diisi','err'); return; }
+        const db2 = getDB();
+        if(p){
+          const target = db2.photos.find(x=>x.id===p.id);
+          target.title = title; target.desc = desc; target.url = url;
+          toast('Foto diperbarui','ok');
+        } else {
+          db2.photos.push({ id: uid('p'), title, desc, url, date: todayStr() });
+          toast('Foto ditambahkan','ok');
+        }
+        saveDB(db2);
+        closeModal();
+        render();
+      });
+    });
+  }
+
+  function deletePhoto(id){
+    const db = getDB();
+    if(!confirm('Hapus foto ini?')) return;
+    db.photos = db.photos.filter(x=>x.id!==id);
+    saveDB(db);
+    toast('Foto dihapus','ok');
+    render();
+  }
+
+  render();
+}
+</script>
+</body>
+</html>

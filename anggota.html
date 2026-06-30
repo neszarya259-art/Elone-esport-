@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anggota — ALONE ESPORT</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<script src="assets/app.js"></script>
+<script>
+const session = buildShell('anggota.html', 'Anggota', 'Kelola seluruh anggota guild ALONE ESPORT');
+if(session){
+  const isOwner = session.role === 'Owner';
+  const content = document.getElementById('page-content');
+
+  function render(){
+    const db = getDB();
+    content.innerHTML = `
+      <div class="card panel">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <h3 style="margin:0;">Daftar Anggota (${db.members.length})</h3>
+          ${isOwner ? `<button class="btn btn-primary" id="add-member-btn">+ Tambah Anggota</button>` : ''}
+        </div>
+        <div style="overflow-x:auto; margin-top:10px;">
+        <table>
+          <thead><tr><th>Nama</th><th>Role</th><th>Status</th><th>Bergabung</th>${isOwner?'<th>Aksi</th>':''}</tr></thead>
+          <tbody>
+            ${db.members.map(m=>`
+              <tr>
+                <td><strong>${escapeHtml(m.nama)}</strong></td>
+                <td><span class="badge ${m.role==='Owner'?'badge-pink':m.role==='Admin'?'badge-purple':'badge-cyan'}">${m.role}</span></td>
+                <td><span class="badge ${m.status==='Aktif'?'badge-ok':'badge-muted'}">${m.status}</span></td>
+                <td>${m.joined}</td>
+                ${isOwner ? `<td class="row-actions">
+                  <button class="btn btn-sm btn-ghost edit-btn" data-id="${m.id}">Edit</button>
+                  <button class="btn btn-sm btn-danger del-btn" data-id="${m.id}">Hapus</button>
+                </td>` : ''}
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        </div>
+      </div>
+    `;
+
+    if(isOwner){
+      document.getElementById('add-member-btn').addEventListener('click', ()=> openMemberModal(null));
+      content.querySelectorAll('.edit-btn').forEach(b=> b.addEventListener('click', ()=> openMemberModal(b.dataset.id)));
+      content.querySelectorAll('.del-btn').forEach(b=> b.addEventListener('click', ()=> deleteMember(b.dataset.id)));
+    }
+  }
+
+  function openMemberModal(id){
+    const db = getDB();
+    const m = id ? db.members.find(x=>x.id===id) : null;
+    openModal(`
+      <h3>${m ? 'Edit Anggota' : 'Tambah Anggota'}</h3>
+      <div class="field"><label>Nama</label><input id="mf-nama" value="${m ? escapeHtml(m.nama) : ''}"></div>
+      <div class="field"><label>Password ${m ? '(kosongkan jika tidak diubah)' : ''}</label><input id="mf-pass" type="text" value="${m ? '' : ''}" placeholder="${m ? '••••••' : 'Password awal'}"></div>
+      <div class="field"><label>Role</label>
+        <select id="mf-role">
+          <option value="Member" ${m && m.role==='Member'?'selected':''}>Member</option>
+          <option value="Admin" ${m && m.role==='Admin'?'selected':''}>Admin</option>
+          <option value="Owner" ${m && m.role==='Owner'?'selected':''}>Owner</option>
+        </select>
+      </div>
+      <div class="field"><label>Status</label>
+        <select id="mf-status">
+          <option value="Aktif" ${!m || m.status==='Aktif'?'selected':''}>Aktif</option>
+          <option value="Nonaktif" ${m && m.status==='Nonaktif'?'selected':''}>Nonaktif</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="mf-cancel">Batal</button>
+        <button class="btn btn-primary" id="mf-save">Simpan</button>
+      </div>
+    `, ()=>{
+      document.getElementById('mf-cancel').addEventListener('click', closeModal);
+      document.getElementById('mf-save').addEventListener('click', ()=>{
+        const nama = document.getElementById('mf-nama').value.trim();
+        const pass = document.getElementById('mf-pass').value;
+        const role = document.getElementById('mf-role').value;
+        const status = document.getElementById('mf-status').value;
+        if(!nama){ toast('Nama wajib diisi','err'); return; }
+        const db2 = getDB();
+        if(m){
+          const target = db2.members.find(x=>x.id===m.id);
+          target.nama = nama; target.role = role; target.status = status;
+          if(pass) target.password = pass;
+          toast('Data anggota diperbarui', 'ok');
+        } else {
+          if(!pass){ toast('Password awal wajib diisi','err'); return; }
+          db2.members.push({ id: uid('m'), nama, password: pass, role, status, joined: todayStr() });
+          toast('Anggota baru ditambahkan', 'ok');
+        }
+        saveDB(db2);
+        closeModal();
+        render();
+      });
+    });
+  }
+
+  function deleteMember(id){
+    const db = getDB();
+    const m = db.members.find(x=>x.id===id);
+    if(!m) return;
+    if(!confirm(`Hapus anggota "${m.nama}"?`)) return;
+    db.members = db.members.filter(x=>x.id!==id);
+    saveDB(db);
+    toast('Anggota dihapus', 'ok');
+    render();
+  }
+
+  render();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Video — ALONE ESPORT</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<script src="assets/app.js"></script>
+<script>
+const session = buildShell('video.html', 'Video', 'Koleksi video & highlight pertandingan');
+if(session){
+  const isOwner = session.role === 'Owner';
+  const content = document.getElementById('page-content');
+
+  function render(){
+    const db = getDB();
+    content.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:18px;">
+        <div style="color:var(--muted);">${db.videos.length} video tersimpan</div>
+        ${isOwner ? `<button class="btn btn-primary" id="add-video-btn">+ Tambah Video</button>` : ''}
+      </div>
+      <div class="grid grid-3" id="video-grid"></div>
+    `;
+    const grid = document.getElementById('video-grid');
+    grid.innerHTML = db.videos.length ? db.videos.map(v=>`
+      <div class="card video-card glow-cyan">
+        ${v.type==='youtube'
+          ? `<iframe src="${v.url}" allowfullscreen></iframe>`
+          : `<video src="${v.url}" controls></video>`}
+        <div class="pc-body" style="padding:14px;">
+          <h4>${escapeHtml(v.title)}</h4>
+          <p>${escapeHtml(v.desc)}</p>
+          ${isOwner ? `<div class="row-actions" style="margin-top:10px;">
+            <button class="btn btn-sm btn-ghost edit-btn" data-id="${v.id}">Edit</button>
+            <button class="btn btn-sm btn-danger del-btn" data-id="${v.id}">Hapus</button>
+          </div>` : ''}
+        </div>
+      </div>
+    `).join('') : `<div class="card empty" style="grid-column:1/-1;"><div class="e-icon">🎬</div>Belum ada video</div>`;
+
+    if(isOwner){
+      document.getElementById('add-video-btn').addEventListener('click', ()=> openVideoModal(null));
+      grid.querySelectorAll('.edit-btn').forEach(b=> b.addEventListener('click', ()=> openVideoModal(b.dataset.id)));
+      grid.querySelectorAll('.del-btn').forEach(b=> b.addEventListener('click', ()=> deleteVideo(b.dataset.id)));
+    }
+  }
+
+  function openVideoModal(id){
+    const db = getDB();
+    const v = id ? db.videos.find(x=>x.id===id) : null;
+    openModal(`
+      <h3>${v ? 'Edit Video' : 'Tambah Video'}</h3>
+      <div class="field"><label>Judul</label><input id="vf-title" value="${v ? escapeHtml(v.title) : ''}"></div>
+      <div class="field"><label>Deskripsi</label><textarea id="vf-desc" rows="3">${v ? escapeHtml(v.desc) : ''}</textarea></div>
+      <div class="field"><label>Tipe</label>
+        <select id="vf-type">
+          <option value="youtube" ${!v || v.type==='youtube'?'selected':''}>YouTube Embed</option>
+          <option value="file" ${v && v.type==='file'?'selected':''}>Upload File</option>
+        </select>
+      </div>
+      <div class="field"><label>Link Embed YouTube atau Upload File</label>
+        <input id="vf-url" value="${v ? v.url : ''}" placeholder="https://www.youtube.com/embed/...">
+        <input id="vf-file" type="file" accept="video/*" style="margin-top:8px;">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="vf-cancel">Batal</button>
+        <button class="btn btn-primary" id="vf-save">Simpan</button>
+      </div>
+    `, ()=>{
+      document.getElementById('vf-cancel').addEventListener('click', closeModal);
+      document.getElementById('vf-file').addEventListener('change', (e)=>{
+        const file = e.target.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = ()=>{
+          document.getElementById('vf-url').value = reader.result;
+          document.getElementById('vf-type').value = 'file';
+          toast('File video dimuat, klik Simpan','info');
+        };
+        reader.readAsDataURL(file);
+      });
+      document.getElementById('vf-save').addEventListener('click', ()=>{
+        const title = document.getElementById('vf-title').value.trim();
+        const desc = document.getElementById('vf-desc').value.trim();
+        const type = document.getElementById('vf-type').value;
+        const url = document.getElementById('vf-url').value.trim();
+        if(!title || !url){ toast('Judul dan link/video wajib diisi','err'); return; }
+        const db2 = getDB();
+        if(v){
+          const target = db2.videos.find(x=>x.id===v.id);
+          target.title = title; target.desc = desc; target.url = url; target.type = type;
+          toast('Video diperbarui','ok');
+        } else {
+          db2.videos.push({ id: uid('v'), title, desc, url, type, date: todayStr() });
+          toast('Video ditambahkan','ok');
+        }
+        saveDB(db2);
+        closeModal();
+        render();
+      });
+    });
+  }
+
+  function deleteVideo(id){
+    const db = getDB();
+    if(!confirm('Hapus video ini?')) return;
+    db.videos = db.videos.filter(x=>x.id!==id);
+    saveDB(db);
+    toast('Video dihapus','ok');
+    render();
+  }
+
+  render();
+}
+</script>
+</body>
+</html>

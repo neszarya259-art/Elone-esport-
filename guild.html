@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guild — ALONE ESPORT</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<script src="assets/app.js"></script>
+<script>
+const session = buildShell('guild.html', 'Guild', 'Profil resmi ALONE ESPORT');
+if(session){
+  const isOwner = session.role === 'Owner';
+  const content = document.getElementById('page-content');
+
+  function render(){
+    const db = getDB();
+    const g = db.guild;
+    content.innerHTML = `
+      <div class="card panel glow-purple" style="text-align:center; padding:36px;">
+        <div style="font-size:4rem;">${g.logo}</div>
+        <h1 style="margin:8px 0 0;">${escapeHtml(g.name)}</h1>
+        <span class="badge badge-cyan">${escapeHtml(g.tag)}</span>
+        <p style="max-width:560px; margin:16px auto 0; color:var(--muted);">${escapeHtml(g.description)}</p>
+        <div style="display:flex; justify-content:center; gap:30px; margin-top:24px; flex-wrap:wrap;">
+          <div><div class="num" style="font-family:'Orbitron'; font-size:1.6rem; color:var(--cyan);">${db.members.length}</div><div class="lbl" style="color:var(--muted); font-size:.8rem;">ANGGOTA</div></div>
+          <div><div class="num" style="font-family:'Orbitron'; font-size:1.6rem; color:var(--pink);">${g.founded}</div><div class="lbl" style="color:var(--muted); font-size:.8rem;">BERDIRI</div></div>
+        </div>
+      </div>
+
+      ${isOwner ? `
+      <div class="card panel">
+        <h3>Edit Profil Guild</h3>
+        <div class="grid grid-2">
+          <div class="field"><label>Nama Guild</label><input id="gf-name" value="${escapeHtml(g.name)}"></div>
+          <div class="field"><label>Tag</label><input id="gf-tag" value="${escapeHtml(g.tag)}"></div>
+          <div class="field"><label>Logo (emoji)</label><input id="gf-logo" value="${g.logo}"></div>
+          <div class="field"><label>Tanggal Berdiri</label><input id="gf-founded" type="date" value="${g.founded}"></div>
+        </div>
+        <div class="field"><label>Deskripsi</label><textarea id="gf-desc" rows="4">${escapeHtml(g.description)}</textarea></div>
+        <button class="btn btn-primary" id="gf-save">Simpan Perubahan</button>
+      </div>
+      ` : ''}
+    `;
+
+    if(isOwner){
+      document.getElementById('gf-save').addEventListener('click', ()=>{
+        const db2 = getDB();
+        db2.guild.name = document.getElementById('gf-name').value.trim() || db2.guild.name;
+        db2.guild.tag = document.getElementById('gf-tag').value.trim() || db2.guild.tag;
+        db2.guild.logo = document.getElementById('gf-logo').value.trim() || db2.guild.logo;
+        db2.guild.founded = document.getElementById('gf-founded').value || db2.guild.founded;
+        db2.guild.description = document.getElementById('gf-desc').value.trim();
+        saveDB(db2);
+        toast('Profil guild diperbarui','ok');
+        render();
+      });
+    }
+  }
+
+  render();
+}
+</script>
+</body>
+</html>
